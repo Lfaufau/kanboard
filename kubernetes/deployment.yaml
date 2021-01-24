@@ -1,0 +1,63 @@
+# Creates a pod containing the PHP-FPM application (kanboard)
+# and nginx, each mounting the `shared-files` volume to their
+# respective /var/www/app directories.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kanboard-deployment
+  namespace: kanboard
+spec:
+  selector:
+    matchLabels:
+      app: kanboard-app
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: kanboard-app
+    spec:
+      volumes:
+        # Creates the shared files volume to be used in both pods
+        - name: shared-files
+          emptyDir: {}
+
+        # Add the ConfigMap we declared above as a volume for the pod
+        - name: nginx-config-volume
+          configMap:
+            name: nginx-config
+
+      containers:
+        # The image we jsut created locally
+        - image: lydia/kanboard
+          name: kanboard
+          imagePullPolicy: Never # Used for local development
+          ports:
+            - containerPort: 9000
+              name: http
+              protocol: TCP
+          volumeMounts:
+            - name: shared-files
+              mountPath: /var/www/app
+          # So, after the container has started, copies the PHP files from this
+          # container's local filesystem (/app -- added via the Docker image)
+          # to the shared volume, which is mounted at /var/www/app.
+          lifecycle:
+            postStart:
+              exec:
+                command: ["/bin/sh", "-c", "cp -r /app/. /var/www/app"]
+
+        # Our nginx container, which uses the configuration declared above,
+        # along with the files shared with the PHP-FPM app.
+        - image: nginx:1.19-alpine
+          name: nginx
+          volumeMounts:
+            - name: shared-files
+              mountPath: /var/www/app
+            - name: nginx-config-volume
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+          ports:
+            - containerPort: 80
+              name: http
+              protocol: TCP
+...
