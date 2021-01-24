@@ -8,10 +8,9 @@
 *.lock
 *.md
 *.js
-*.sh
 .*.yml
 *.yml
-data/*
+
 plugins/*
 tests
 ChangeLog
